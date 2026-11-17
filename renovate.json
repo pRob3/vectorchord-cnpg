@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "description": [
+    "PostgreSQL patch releases and CNPG's digest rebuilds of the same version merge themselves once the build workflow is green: that workflow starts the image and builds and uses a vchordrq index before anything is pushed, so a red build never reaches the registry. The cluster that consumes the image has its own Renovate and its own night window, so nothing here restarts a database by itself.",
+    "The base tag's suffix, -system-bookworm, is Renovate's compatibility group, so a proposal can never move the image to trixie. That is intended: a glibc change invalidates text indexes (see the Dockerfile).",
+    "minimumReleaseAge is deliberately unset. GHCR publishes no release timestamp, and with the default minimumReleaseAgeBehaviour a soak turns into 'never' for every GHCR image."
+  ],
+  "packageRules": [
+    {
+      "description": "A PostgreSQL major is a database upgrade with a maintenance window, never a routine bump.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/cloudnative-pg/postgresql"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/cloudnative-pg/postgresql"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true
+    }
+  ]
+}

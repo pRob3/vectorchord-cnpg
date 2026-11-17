@@ -1,0 +1,58 @@
+name: build
+
+# Builds the image, proves PostgreSQL starts with VectorChord loaded and can
+# build and query a vchordrq index, and only then pushes. A pull request runs
+# the same build and test and pushes nothing.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      IMAGE: ghcr.io/prob3/cloudnative-vectorchord
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read versions from the Dockerfile
+        id: v
+        run: |
+          pg=$(grep -oP '^FROM ghcr\.io/cloudnative-pg/postgresql:\K[0-9]+\.[0-9]+(?=-system-bookworm@)' Dockerfile)
+          vc=$(grep -oP '/releases/download/\K[0-9]+\.[0-9]+\.[0-9]+(?=/)' Dockerfile)
+          test -n "$pg" && test -n "$vc" || { echo "::error::could not read the versions from the Dockerfile"; exit 1; }
+          echo "pg=$pg" >> "$GITHUB_OUTPUT"
+          echo "tag=$pg-$vc" >> "$GITHUB_OUTPUT"
+          echo "Building $IMAGE:$pg-$vc"
+
+      - name: Build
+        run: |
+          docker build --pull \
+            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
+            -t candidate .
+
+      - name: Test
+        run: |
+          docker run --rm --user 26 -e PG_EXPECTED=${{ steps.v.outputs.pg }} \
+            -v "$PWD/test.sh:/test.sh:ro" candidate bash /test.sh
+
+      - name: Push
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag candidate "$IMAGE:${{ steps.v.outputs.tag }}"
+          docker push "$IMAGE:${{ steps.v.outputs.tag }}"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE:${{ steps.v.outputs.tag }}")
+          echo "Pushed $IMAGE:${{ steps.v.outputs.tag }} as $digest" | tee -a "$GITHUB_STEP_SUMMARY"
