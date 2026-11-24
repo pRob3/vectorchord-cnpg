@@ -14,7 +14,7 @@
 # bookworm's glibc, and trixie's glibc sorts text differently: moving the base
 # would silently invalidate every text index until a REINDEX. That is a planned
 # operation, never a patch release.
-FROM ghcr.io/cloudnative-pg/postgresql:17.12-system-bookworm@sha256:2b71f805acb6744c3d8d82c29256ee6e0580ea49e7a14e8e99b321a21c674439
+FROM ghcr.io/cloudnative-pg/postgresql:17.12-system-bookworm@sha256:e33b1b2b10564e7fb29f7e77e58e3e28338fdc81d2c6c78925bdf24ca47a6cd0
 
 # VectorChord is bumped by hand: the version appears twice in the URL, and the
 # checksum is the release asset's digest as GitHub reports it,
